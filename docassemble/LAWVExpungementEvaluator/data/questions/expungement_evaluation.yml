@@ -16,11 +16,15 @@ imports:
   - itertools
 ---
 include:
-  - common_info.yml
+  - docassemble.LAWVCommon:common_info.yml
 	- statutes.yml
 ---
 features:
   question back button: True
+  javascript: docassemble.LAWVCommon:data/static/force_lightmode.js
+  css: docassemble.LAWVCommon:data/static/lawv.css
+  cache documents: False
+  suppress autofill: True
 ---
 objects:
   - felony_statutes: DAList
