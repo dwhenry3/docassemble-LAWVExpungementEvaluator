@@ -9,7 +9,7 @@ metadata:
   authors:
     - name: Dane W. Henry, Esq.
       organization: Legal Aid of West Virginia, Inc.
-  revision_date: 2020-02-12
+  revision_date: 2024-02-27
 ---
 imports:
   - re
@@ -29,8 +29,9 @@ features:
 objects:
   - felony_statutes: DAList
   - any_statutes: DAList
-  - charge_list: DAList.using(object_type=DAObject, complete_attribute='statute')
+  - charge_list: DAList.using(object_type=DAObject, complete_attribute='statute', there_are_any=True)
   - endpoint: DADict
+  - plea_img: DAStaticFile.using(filename='dismissed_plea.png', alt_text='Disposition - Dismissed - Plea Agreement')
 ---
 terms:
   disposition: |
@@ -75,9 +76,8 @@ subquestion: |
   you were **{convicted}** of, the **{disposition}** of your case(s), and when your incaceration,
   probation, or parole **ended**.  You need to provide accurate information.  If the information
   you provide is not accurate, the results of the tool will not be correct.
+      * [West Virginia Magistrate Court Lookup](https://mcrsearch.courtswv.gov/)
       * [West Virginia State Police Background Check Information](https://www.wvsp.gov/Criminal%20Records/Pages/default.aspx)
-      * [Magistrate Court Information by County](http://www.courtswv.gov/public-resources/court-information-by-county.html)
-      * {Court Reporting Form}
   * If you decide to apply for expungement after answering these questions, a judge in the
   county where you were convicted will decide whether to approve your request.  This site will
   tell you if you *may* be eligible for expungement.  **Only a judge** can decide whether or not
@@ -86,12 +86,12 @@ subquestion: |
   Once you are ready, you can click on the button below to answer some questions about your record. When you are finished, we
   will let you know if you may be eligible for expungement and what you can do next.
 
-  ***Disclaimer***: This website is intended to help you understand whether you may be eligible
-  for expungement in **West Virginia** and **does not serve as a substitute for legal advice from an 
-  attorney**. You should speak to a lawyer if you have questions about your record or are unsure 
-  of how to answer any of the questions on this tool. Use of this website does not create an 
-  attorney-client relationship. Legal Aid of West Virginia is not your attorney.  The information 
-  you provide is not saved by Legal Aid of West Virginia.
+  ***
+  ###Terms of Use:
+  ####<span style="color:black;font-weight:100;">Legal Aid of West Virginia is a non-profit law firm that provides free legal help.  This tool was developed by Legal Aid to provide information and to make it easier to fill out necessary forms.  This tool does not take the place of an attorney-client relationship. Legal Aid is not your attorney.  If you have questions about your specific situation, you should seek legal help.  The information on this tool is based on West Virginia law.  By using this tool, I agree that I have read and understand the information on this page.  If you wish to apply for Legal Aid of West Virginia's services, you may do so here: [https://legalaidwv.org](https://legalaidwv.org/)
+  
+  </span>
+  ***
 field: ready
 buttons: 
   - OK, I understand. Let's get started!
@@ -137,6 +137,12 @@ fields:
       - Withdrawn
       - Assessed Fine & Cost
       - Paid Fine & Cost
+  - Was the disposition part of a plea deal?: charge_list[i].plea
+    datatype: yesnoradio
+    help: |
+      [${ plea_img }](${ plea_img.url_for() })
+    js show if: |
+      val('charge_list[i].verdict') == "Found Not Guilty" || val('charge_list[i].verdict') == "Dismissed" || val('charge_list[i].verdict') == "Withdrawn"
   - Disposition Date: charge_list[i].date
     datatype: date
   - County: charge_list[i].county
@@ -162,7 +168,7 @@ question: |
 fields:
   - no label: incarceration
     datatype: yesnoradio
-  - When did your last incarceration end?: incarceration_end
+  - When did your most recent incarceration end?: incarceration_end
     datatype: date
     show if: incarceration
 under: |
@@ -245,12 +251,13 @@ question: |
 subquestion: |  
   Reason: ${ failure_reason }
   
-  Even so, please do not hestiate to contact [Legal Aid of West Virginia](http://www.lawv.net) 
+  Even so, please do not hestiate to contact [Legal Aid of West Virginia](http://www.legalaidwv.org) 
   or an attorney to review the details of your case.
+
+  The next screen will provide you with a summary of your information to discuss with an attorney.
 field: endpoint['ineligible']
 buttons: 
-  - Exit: exit
-  - Restart: restart
+  - Continue: continue
 under: |
   [Feedback](mailto:dhenry@lawv.net?subject=Expungement Tool Feedback)
 ---
@@ -282,15 +289,35 @@ attachment:
     pdf template file: worksheet.pdf
     editable: False
     fields:
-      - "charges": ${ compiled_charges }
-      - "incarceration": ${ incarceration }
-      - "incarceration_date": ${ incarceration_end }
-      - "probation": ${ probation }
-      - "probation_date": ${ probation_end }
-      - "treatment": ${ substance_abuse }
-      - "treatment_date": ${ substance_date }
-      - "education": ${ adult_ed }
-      - "education_date": ${ adult_date }
+      - charges: ${ compiled_charges }
+      - incarceration: ${ incarceration }
+      - incarceration_date: ${ incarceration_end }
+      - probation: ${ probation }
+      - probation_date: ${ probation_end }
+      - treatment: ${ substance_abuse }
+      - treatment_date: ${ substance_date }
+      - education: ${ adult_ed }
+      - education_date: ${ adult_date }
+      - eligibility_date: |
+          ${ eligible_date if eligibility == "Eligible" else "" }
+      - eligible: ${ eligibility }
+      - eligibility_notes: ${ failure_reason }
+under: |
+  [Feedback](mailto:dhenry@lawv.net?subject=Expungement Tool Feedback)
+---
+question: Final Information
+subquestion: |
+  You can download a PDF summary of your information below.  
+  
+  You can apply for Legal Aid of West Virginia's Services [here](http://www.lawv.net/Get-Help/Apply-for-Help).
+event: generate_dismissed_worksheet
+attachment:
+  - name: LAWV Expungement Evaluation Worksheet
+    filename: LAWV Expungement Evaluation Worksheet
+    pdf template file: worksheet.pdf
+    editable: False
+    fields:
+      - "charges": ${ compiled_charges }      
       - "eligibility_date": ${ eligible_date }
 under: |
   [Feedback](mailto:dhenry@lawv.net?subject=Expungement Tool Feedback)
@@ -323,9 +350,9 @@ code: |
     for charge in charge_list:
       failed = False
       if charge.statute == "61-11-8. Attempts" or charge.statute == "61-10-31. Conspiracy" or charge.statute == "60A-4-414. Conspiracy":
-        compiled_charges += charge.verdict + " of " + charge.type + " " + charge.statute + " to commit " + charge.attempt + " on " + charge.date + " in case " + charge.case + " in " + charge.county + " County.\n\n"
+        compiled_charges += "• " + charge.verdict + " of " + charge.type + " " + charge.statute + " to commit " + charge.attempt + " on " + charge.date + " in case " + charge.case + " in " + charge.county + " County.\n\n"
       else:
-        compiled_charges += charge.verdict + " of " + charge.type + " " + charge.statute + " on " + charge.date + " in case " + charge.case + " in " + charge.county + " County.\n\n"
+        compiled_charges += "• " + charge.verdict + " of " + charge.type + " " + charge.statute + " on " + charge.date + " in case " + charge.case + " in " + charge.county + " County.\n\n"
       # ----------------------
       ## Find the charges that are actually convictions
       # ----------------------
@@ -348,141 +375,124 @@ code: |
             my_regex = statute + wildcard
             if charge.statute == "61-11-8. Attempts" or charge.statute == "61-10-31. Conspiracy" or charge.statute == "60A-4-414. Conspiracy":
               if re.match(my_regex, charge.attempt) and not failed:              
-                failure_reason += charge.type + " &sect;" + charge.statute + " to commit &sect;" + charge.attempt + " is not eligible for expungement.\n\n"
+                failure_reason += charge.type + " §" + charge.statute + " to commit §" + charge.attempt + " is not eligible for expungement.\n\n"
                 failed = True
             else:
               if re.match(my_regex, charge.statute) and not failed:              
-                failure_reason += charge.type + " &sect;" + charge.statute + " is not eligible for expungement.\n\n"
+                failure_reason += charge.type + " §" + charge.statute + " is not eligible for expungement.\n\n"
                 failed = True
         for statute in any_statutes:
           my_regex = statute + wildcard
           if charge.statute == "61-11-8. Attempts" or charge.statute == "61-10-31. Conspiracy" or charge.statute == "60A-4-414. Conspiracy":
             if re.match(my_regex, charge.attempt) and not failed:              
-              failure_reason += charge.type + " &sect;" + charge.statute + " to commit &sect;" + charge.attempt + " is not eligible for expungement.\n\n"
+              failure_reason += charge.type + " §" + charge.statute + " to commit §" + charge.attempt + " is not eligible for expungement.\n\n"
               failed = True
           else:
             if re.match(my_regex, charge.statute) and not failed:
-              failure_reason += charge.type + " &sect;" + charge.statute + " is not eligible for expungement.\n\n"    
+              failure_reason += charge.type + " §" + charge.statute + " is not eligible for expungement.\n\n"    
               failed = True
         for conviction_1, conviction_2 in itertools.combinations(charge_list, 2):
           if conviction_1.type == 'Felony' and conviction_2.type == 'Felony':
             if conviction_1.date != conviction_2.date:
               failure_reason += conviction_1.type + " " + conviction_1.statute + " and " + conviction_2.type + " " + conviction_2.statute + " did not occur during the same transaction or occurrence.\n\n"
             if conviction_1.county != conviction_2.county:
-              failure_reason += conviction_1.type + " " + conviction_1.statute + " and " + conviction_2.type + " " + conviction_2.statute + " did not occur during the same transaction or occurrence.\n\n"
-    if failure_reason != "":
-      endpoint['ineligible']
-      if endpoint['ineligible'] == 'exit':
-        command('exit')
-      elif endpoint['ineligible'] == 'restart':
-        command('restart')
-    elif not felony_conviction and not multiple_felony and not misdemeanor_conviction and not multiple_misdemeanor:
-      failure_reason += "It does not appear you have any convictions.\n\n"
-      failure_reason += "Please restart the tool and select the appropriate option for no conviction.\n"
-      endpoint['ineligible']
-      if endpoint['ineligible'] == 'exit':
-          command('exit')
-      elif endpoint['ineligible'] == 'restart':
-          command('restart')
-    # ----------------------            
-    ## If we get here, then no conviction was excluded by the statute and
-    ## no multiple convictions violated the 'same transaction' language.
-    # ----------------------
-    incarceration
-    probation
-    adult_ed
-    substance_abuse    
+              failure_reason += conviction_1.type + " " + conviction_1.statute + " and " + conviction_2.type + " " + conviction_2.statute + " did not occur during the same transaction or occurrence.\n\n"    
     
-    # ----------------------
-    ## Get starting_date
-    # ----------------------
-    conviction_date = as_datetime('1/1/1930')
-    for charge in charge_list:
-      if charge.verdict != "Found Not Guilty" and charge.verdict != "Dismissed" and charge.verdict != "Withdrawn":
-        temp_date = charge.date
-        conviction_date = as_datetime(max(conviction_date, temp_date))        
-    if not incarceration:
-      incarceration_end = as_datetime('1/1/1931')
-    else:
-      incarceration_end = as_datetime(incarceration_end)
-    if not probation:
-      probation_end = as_datetime('1/1/1931')
-    else:
-      probation_end = as_datetime(probation_end)
-    starting_date = as_datetime(max(conviction_date, incarceration_end, probation_end))
-    if adult_ed or substance_abuse:
-      if felony_conviction:
-        eligible_date = starting_date.plus(years=3)
-      elif multiple_misdemeanor:
-        eligible_date = starting_date.plus(years=1)
-      else:
-        eligible_date = starting_date.plus(days=90)
-    else:
-      if felony_conviction:
-        eligible_date = starting_date.plus(years=5)
-      elif multiple_misdemeanor:
-        eligible_date = starting_date.plus(years=2)
-      else:
-        eligible_date = starting_date.plus(years=1)
-    if eligible_date > current_datetime():
-      failure_reason += "You have not waited enough time since your conviction, incarceration, or probation ended on " + starting_date + "."
-      failure_reason += "\n\n"
-      failure_reason += "**Your eligible date is " + eligible_date + ".**"
-      endpoint['ineligible']
-      if endpoint['ineligible'] == 'exit':
-        command('exit')
-      elif endpoint['ineligible'] == 'restart':
-        command('restart')
-    # Setting dates for PDF
-    if not incarceration:
+    if not felony_conviction and not multiple_felony and not misdemeanor_conviction and not multiple_misdemeanor:
+      # Dismissed charges only
+      for charge in charge_list:        
+        eligible_date = charge.date.plus(days=60)
+        if eligible_date > current_datetime():
+          failure_reason += "You have not waited enough time since your dismissal or acquittal on " + charge.date + " for " + charge.statute + ".\n"
+          failure_reason += "**Your eligible date is " + eligible_date + ".**\n\n"
+        if charge.plea:
+          failure_reason += "The dismissal or aquittal of " + charge.statute + " on " + charge.date + " cannot be as part of a guilty plea agreement.\n\n"
+      prior
+      if prior:
+        failure_reason += "You cannot have a felony conviction under W. Va. Code §61-11-25(a).\n\n"
+      pending_related
+      if pending_related:
+        failure_reason += "You cannot have any pending charges related to the incident that caused the charges that were dismissed.\n\n"
+      
+      # Setting info for PDF
+      incarceration = False
       incarceration_end = ""
-    if not probation:
+      probation = False
       probation_end = ""
-    if not adult_ed:
+      adult_ed = False
       adult_date = ""
-    if not substance_abuse:
+      substance_abuse = False
       substance_date = ""
-    # ----------------------
-    ## If we get here, then the time requirements have been met
-    # ----------------------
-    pending
-    if pending:
-      failure_reason += "You cannot seek an expungement with pending charges against you\n"
-      endpoint['ineligible']
-      if endpoint['ineligible'] == 'exit':
-        command('exit')
-      elif endpoint['ineligible'] == 'restart':
-        command('restart')
-    # ----------------------
-    ## This is just a little break point to let the user know
-    ## their convictions should be eligible
-    # ----------------------
-    endpoint['eligible']
-    generate_worksheet
+    else:
+      # ----------------------            
+      ## If we get here, then no conviction was excluded by the statute and
+      ## no multiple convictions violated the 'same transaction' language.
+      # ----------------------
+      incarceration
+      probation
+      adult_ed
+      substance_abuse    
     
-  # ----------------------
-  ## This section generates the motion to expunge non-convictions/acquittals
-  # ----------------------
-  else:
-    dismissal_date
-    eligible_date = dismissal_date.plus(days=60)
-    if eligible_date > current_datetime():
-      failure_reason += "You have not waited enough time since your dismissal or acquittal on " + dismissal_date + "."
-      failure_reason += "\n\n"
-      failure_reason += "**Your eligible date is " + eligible_date + ".**"
+      # ----------------------
+      ## Get starting_date
+      # ----------------------
+      conviction_date = as_datetime('1/1/1930')
+      for charge in charge_list:
+        if charge.verdict != "Found Not Guilty" and charge.verdict != "Dismissed" and charge.verdict != "Withdrawn":
+          temp_date = charge.date
+          conviction_date = as_datetime(max(conviction_date, temp_date))        
+      if not incarceration:
+        incarceration_end = as_datetime('1/1/1931')
+      else:
+        incarceration_end = as_datetime(incarceration_end)
+      if not probation:
+        probation_end = as_datetime('1/1/1931')
+      else:
+        probation_end = as_datetime(probation_end)
+      starting_date = as_datetime(max(conviction_date, incarceration_end, probation_end))
+      if adult_ed or substance_abuse:
+        if felony_conviction:
+          eligible_date = starting_date.plus(years=3)
+        elif multiple_misdemeanor:
+          eligible_date = starting_date.plus(years=1)
+        else:
+          eligible_date = starting_date.plus(days=90)
+      else:
+        if felony_conviction:
+          eligible_date = starting_date.plus(years=5)
+        elif multiple_misdemeanor:
+          eligible_date = starting_date.plus(years=2)
+        else:
+          eligible_date = starting_date.plus(years=1)
+      if eligible_date > current_datetime():
+        failure_reason += "You have not waited enough time since your conviction, incarceration, or probation ended on " + starting_date + ".\n"
+        failure_reason += "**Your eligible date is " + eligible_date + ".**\n\n"
+        
+      # Setting dates for PDF
+      if not incarceration:
+        incarceration_end = ""
+      if not probation:
+        probation_end = ""
+      if not adult_ed:
+        adult_date = ""
+      if not substance_abuse:
+        substance_date = ""
+      # ----------------------
+      ## If we get here, then the time requirements have been met
+      # ----------------------
+      pending
+      if pending:
+        failure_reason += "You cannot seek an expungement with pending charges against you.\n"
+              
+      # -------------------
+      # Originally, the tool kicked the user out once it was determined they were ineligible.
+      # However, I wanted to go ahead and provide the user with the 1-page worksheet regardless
+      # in the event they wanted to speak with an attorney so that the work does not have to be duplicated
+      # -------------------
+    if failure_reason != "":
+      eligibility = "Not Eligible"
       endpoint['ineligible']
-      if endpoint['ineligible'] == 'exit':
-        command('exit')
-    prior
-    if prior:
-      failure_reason += "You cannot have a felony conviction under W. Va. Code &sect; 61-11-25(a)."      
-      endpoint['ineligible']
-      if endpoint['ineligible'] == 'exit':
-        command('exit')
-    pending_related
-    if pending_related:
-      failure_reason += "You cannot have any pending charges related to the incident that caused the charges that were dismissed."      
-      endpoint['ineligible']
-      if endpoint['ineligible'] == 'exit':
-        command('exit')    
-    endpoint['eligible']
+    else:
+      eligibility = "Eligible"
+      endpoint['eligible']
+    generate_worksheet
