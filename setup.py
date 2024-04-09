@@ -44,7 +44,7 @@ def find_package_data(where='.', package='', exclude=standard_exclude, exclude_d
     return out
 
 setup(name='docassemble.LAWVExpungementEvaluator',
-      version='1.0.0',
+      version='1.0.1',
       description=('A docassemble extension.'),
       long_description="This tool is designed to produce a single-page summary of a user's convictions and determine whether any of those convictions are elgible for expungement.",
       long_description_content_type='text/markdown',
@@ -54,7 +54,7 @@ setup(name='docassemble.LAWVExpungementEvaluator',
       url='https://docassemble.org',
       packages=find_packages(),
       namespace_packages=['docassemble'],
-      install_requires=[],
+      install_requires=['docassemble.LAWVCommon>=1.0.6'],
       zip_safe=False,
       package_data=find_package_data(where='docassemble/LAWVExpungementEvaluator/', package='docassemble.LAWVExpungementEvaluator'),
      )
