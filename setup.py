@@ -1,6 +1,6 @@
 import os
 import sys
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 from fnmatch import fnmatchcase
 from distutils.util import convert_path
 
@@ -44,7 +44,7 @@ def find_package_data(where='.', package='', exclude=standard_exclude, exclude_d
     return out
 
 setup(name='docassemble.LAWVExpungementEvaluator',
-      version='1.0.1',
+      version='1.0.2',
       description=('A docassemble extension.'),
       long_description="This tool is designed to produce a single-page summary of a user's convictions and determine whether any of those convictions are elgible for expungement.",
       long_description_content_type='text/markdown',
@@ -52,9 +52,8 @@ setup(name='docassemble.LAWVExpungementEvaluator',
       author_email='dhenry@lawv.net',
       license='The MIT License (MIT)',
       url='https://docassemble.org',
-      packages=find_packages(),
-      namespace_packages=['docassemble'],
-      install_requires=['docassemble.LAWVCommon>=1.0.6'],
+      packages=find_namespace_packages(),
+      install_requires=['docassemble.LAWVCommon>=1.0.12'],
       zip_safe=False,
       package_data=find_package_data(where='docassemble/LAWVExpungementEvaluator/', package='docassemble.LAWVExpungementEvaluator'),
      )
